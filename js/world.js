@@ -8,6 +8,15 @@ const QUALITY = {
   mobile: { pixelRatio: 1.5, msaa: 2, sse: 16, cacheMB: 384 },
 };
 
+// Chase view, per mode: metres behind and above the flyer, field of view and downward tilt in degrees,
+// and how many seconds the camera takes to swing round after a turn.
+export const CHASE = {
+  hero: { distance: 6, lift: 1.5, fov: 70, lookDown: 8, lag: 0.25 },
+  drone: { distance: 3.2, lift: 1.5, fov: 65, lookDown: 17, lag: 0.4 },
+};
+const CHASE_ROLL = 0.3; // the chase camera leans this much of your bank, so the flyer visibly tilts
+let chase; // the chase camera's own heading, pitch and roll, trailing the flyer's
+
 // Drone camera feed: monochrome with a faint green cast and a little extra contrast.
 const SENSOR_SHADER = `
   uniform sampler2D colorTexture;
@@ -61,19 +70,56 @@ export async function createWorld(mobile) {
   return { viewer, tileset, sensorStage, baseSse: quality.sse };
 }
 
-export function placeCamera(viewer, f, seconds) {
+// view is "cockpit" (looking out from the flyer) or "chase" (watching it from behind).
+export function placeCamera(viewer, f, view, seconds) {
   // Buffeting: a smooth, uneven wobble from mixed sine waves. Per-frame random jitter reads as a glitch.
   const wobble = f.buffet * PROFILES[f.mode].shake + f.bump;
   const shakeHeading = wobble * (Math.sin(seconds * 29) + 0.5 * Math.sin(seconds * 53));
   const shakePitch = wobble * (Math.sin(seconds * 23) + 0.5 * Math.sin(seconds * 61));
+  const eye = view === "chase" ? trailFlyer(f, seconds) : f;
   viewer.camera.setView({
-    destination: f.position,
+    destination: eye.position,
     orientation: {
-      heading: Cesium.Math.toRadians(f.heading + shakeHeading),
-      pitch: Cesium.Math.toRadians(f.pitch + shakePitch),
-      roll: Cesium.Math.toRadians(f.roll),
+      heading: Cesium.Math.toRadians(eye.heading + shakeHeading),
+      pitch: Cesium.Math.toRadians(eye.pitch + shakePitch),
+      roll: Cesium.Math.toRadians(eye.roll),
     },
   });
+}
+
+// Chase camera: behind and above the flyer, swinging round after it with a short lag,
+// so you see it lean into turns instead of the world spinning round it.
+function trailFlyer(f, seconds) {
+  const c = CHASE[f.mode];
+  // Start fresh after a jump to a new place, or when switching to this view.
+  if (!chase || chase.flight !== f || seconds - chase.seconds > 0.5) {
+    chase = { flight: f, heading: f.heading, pitch: f.pitch, roll: 0, seconds };
+  }
+  const follow = 1 - Math.exp(-(seconds - chase.seconds) / c.lag);
+  chase.seconds = seconds;
+  chase.heading += (((f.heading - chase.heading + 540) % 360) - 180) * follow; // the short way round
+  chase.pitch += (f.pitch - chase.pitch) * follow;
+  chase.roll += (f.roll * CHASE_ROLL - chase.roll) * follow;
+
+  // Step back along the line of flight and up, in metres east, north and up from the flyer.
+  const h = Cesium.Math.toRadians(chase.heading);
+  const p = Cesium.Math.toRadians(chase.pitch);
+  const back = new Cesium.Cartesian3(
+    -Math.sin(h) * (c.distance * Math.cos(p) + c.lift * Math.sin(p)),
+    -Math.cos(h) * (c.distance * Math.cos(p) + c.lift * Math.sin(p)),
+    c.lift * Math.cos(p) - c.distance * Math.sin(p),
+  );
+  const toEarth = Cesium.Transforms.eastNorthUpToFixedFrame(f.position);
+  const place = Cesium.Cartographic.fromCartesian(Cesium.Matrix4.multiplyByPoint(toEarth, back, back));
+  // Climbing steeply puts the camera below you: keep it out of the ground.
+  if (f.groundBelow !== undefined) place.height = Math.max(place.height, f.groundBelow + 1);
+
+  return {
+    position: Cesium.Cartographic.toCartesian(place),
+    heading: chase.heading,
+    pitch: chase.pitch - c.lookDown,
+    roll: chase.roll,
+  };
 }
 
 // The faster the ground sweeps past, the coarser the tiles: they arrive in time, so the view blurs

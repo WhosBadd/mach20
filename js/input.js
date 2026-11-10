@@ -15,10 +15,11 @@ const mouseStick = { x: 0, y: 0 };
 const touchStick = { x: 0, y: 0 };
 const tilt = { on: false, calibrate: false, flip: 1, neutralPitch: 0, x: 0, y: 0 };
 
-export function setupInput({ canvas, mobile, isRunning, onToggleMode, onMenu }) {
+export function setupInput({ canvas, mobile, isRunning, onToggleMode, onToggleView, onMenu }) {
   window.addEventListener("keydown", (e) => {
     if (e.code.startsWith("Arrow")) e.preventDefault();
     if (e.code === "KeyV" && !e.repeat) onToggleMode();
+    if (e.code === "KeyC" && !e.repeat) onToggleView();
     if (e.code === "Escape" && !document.pointerLockElement) onMenu();
     keys.add(e.code);
   });
@@ -44,7 +45,7 @@ export function setupInput({ canvas, mobile, isRunning, onToggleMode, onMenu }) 
     { passive: true },
   );
 
-  if (mobile) setupTouch({ onToggleMode, onMenu });
+  if (mobile) setupTouch({ onToggleMode, onToggleView, onMenu });
 }
 
 export function lockPointer(canvas) {
@@ -72,7 +73,7 @@ function keyAxis(plus, minus) {
   return (keys.has(plus) ? 1 : 0) - (keys.has(minus) ? 1 : 0);
 }
 
-function setupTouch({ onToggleMode, onMenu }) {
+function setupTouch({ onToggleMode, onToggleView, onMenu }) {
   const stick = document.getElementById("stick");
   const knob = document.getElementById("stick-knob");
   const throttle = document.getElementById("throttle");
@@ -124,6 +125,7 @@ function setupTouch({ onToggleMode, onMenu }) {
 
   document.getElementById("btn-menu").addEventListener("click", onMenu);
   document.getElementById("btn-mode").addEventListener("click", onToggleMode);
+  document.getElementById("btn-view").addEventListener("click", onToggleView);
   tiltButton.addEventListener("click", async () => {
     await toggleTilt();
     tiltButton.classList.toggle("active", tilt.on);

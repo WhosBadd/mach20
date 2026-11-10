@@ -1,6 +1,7 @@
 // Starts the app, runs the menu, and runs the game loop once per rendered frame.
 import { PLACES } from "../config.js";
-import { createWorld, placeCamera, setSunForLongitude, updateTileDetail } from "./world.js";
+import { CHASE, createWorld, placeCamera, setSunForLongitude, updateTileDetail } from "./world.js";
+import { loadFlyers, updateFlyers } from "./flyer.js";
 import { PROFILES, createFlight, pointAhead, stepFlight } from "./flight.js";
 import { controls, lockPointer, readControls, setupInput } from "./input.js";
 import { buildHud, updateHud } from "./hud.js";
@@ -18,7 +19,9 @@ const startButton = $("btn-start");
 const soundButton = $("btn-sound");
 
 let world;
+let flyers;
 let flight;
+let view = "chase"; // "chase" (watch the flyer from behind) or "cockpit" (first person)
 let running = false;
 let muted = false;
 let lastFrame = performance.now();
@@ -35,18 +38,21 @@ async function main() {
     return;
   }
   world.tileset.initialTilesLoaded.addEventListener(() => status.classList.add("hidden"));
+  flyers = await loadFlyers(world.viewer.scene);
 
   flight = createFlight(PLACES[0], "hero");
   setMode("hero");
+  setView(view);
   buildMenu();
   setupInput({
     canvas: world.viewer.canvas,
     mobile: isMobile,
     isRunning: () => running,
     onToggleMode: () => setMode(flight.mode === "hero" ? "drone" : "hero"),
+    onToggleView: () => setView(view === "chase" ? "cockpit" : "chase"),
     onMenu: openMenu,
   });
-  window.addEventListener("resize", () => buildHud(PROFILES[flight.mode].fov));
+  window.addEventListener("resize", applyCamera);
 
   world.viewer.scene.preUpdate.addEventListener(frame);
   world.viewer.scene.postRender.addEventListener(sampleGround);
@@ -64,7 +70,8 @@ function frame() {
   }
   updateTileDetail(world, flight);
   setSunForLongitude(world.viewer, flight.lon);
-  placeCamera(world.viewer, flight, now / 1000);
+  placeCamera(world.viewer, flight, view, now / 1000);
+  updateFlyers(flyers, flight, view, controls.throttle, now / 1000);
   updateHud(flight, controls.throttle, running ? dt : 0);
   updateSound(flight, controls.throttle, running);
 }
@@ -75,8 +82,9 @@ function sampleGround() {
   if (now - lastGroundSample < 100) return;
   lastGroundSample = now;
   const scene = world.viewer.scene;
-  flight.groundBelow = scene.sampleHeight(Cesium.Cartographic.fromCartesian(flight.position));
-  flight.groundAhead = flight.speed > 20 ? scene.sampleHeight(pointAhead(flight, flight.speed)) : undefined;
+  const notGround = [flyers.hero, flyers.drone]; // otherwise the flyer stands on its own head and rises forever
+  flight.groundBelow = scene.sampleHeight(Cesium.Cartographic.fromCartesian(flight.position), notGround);
+  flight.groundAhead = flight.speed > 20 ? scene.sampleHeight(pointAhead(flight, flight.speed), notGround) : undefined;
 }
 
 function setMode(mode) {
@@ -86,10 +94,25 @@ function setMode(mode) {
   for (const button of document.querySelectorAll("[data-mode]")) {
     button.classList.toggle("active", button.dataset.mode === mode);
   }
-  world.viewer.camera.frustum.fov = Cesium.Math.toRadians(PROFILES[mode].fov);
-  world.sensorStage.enabled = mode === "drone";
-  buildHud(PROFILES[mode].fov);
+  applyCamera();
   playModeChirp(mode);
+}
+
+function setView(next) {
+  view = next;
+  document.body.classList.toggle("view-chase", view === "chase");
+  for (const button of document.querySelectorAll("[data-view]")) {
+    button.classList.toggle("active", button.dataset.view === view);
+  }
+  applyCamera();
+}
+
+// Field of view, HUD scale and the drone's camera-feed look depend on both the mode and the view.
+function applyCamera() {
+  const fov = view === "chase" ? CHASE[flight.mode].fov : PROFILES[flight.mode].fov;
+  world.viewer.camera.frustum.fov = Cesium.Math.toRadians(fov);
+  world.sensorStage.enabled = flight.mode === "drone" && view === "cockpit";
+  buildHud(fov);
 }
 
 function buildMenu() {
@@ -106,6 +129,9 @@ function buildMenu() {
   }
   for (const button of document.querySelectorAll("[data-mode]")) {
     button.addEventListener("click", () => setMode(button.dataset.mode));
+  }
+  for (const button of document.querySelectorAll("[data-view]")) {
+    button.addEventListener("click", () => setView(button.dataset.view));
   }
   startButton.addEventListener("click", startFlying);
   soundButton.addEventListener("click", () => {

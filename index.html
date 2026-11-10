@@ -85,8 +85,11 @@
     <div id="touch">
       <div id="stick" class="stick"><div id="stick-knob" class="stick-knob"></div></div>
       <div id="throttle" class="throttle"><div id="throttle-fill" class="throttle-fill"></div><span id="throttle-label">0%</span></div>
-      <div class="touch-buttons">
+      <div class="touch-buttons left">
         <button id="btn-tilt">TILT</button>
+        <button id="btn-view">VIEW</button>
+      </div>
+      <div class="touch-buttons right">
         <button id="btn-mode">MODE</button>
         <button id="btn-menu">MENU</button>
       </div>
@@ -112,6 +115,12 @@
           <button data-mode="drone">Recon drone</button>
         </div>
 
+        <div class="section">Camera</div>
+        <div class="segmented">
+          <button data-view="chase">Chase</button>
+          <button data-view="cockpit">First person</button>
+        </div>
+
         <div class="section">Jump to</div>
         <div id="places" class="places"></div>
 
@@ -120,11 +129,12 @@
           <li><b>Mouse</b> steer. Click the view to grab the mouse, <b>Esc</b> for this menu</li>
           <li><b>↑ ↓</b> climb / dive · <b>← →</b> bank · <b>Q E</b> yaw</li>
           <li><b>W S</b> or <b>scroll</b> throttle · <b>V</b> switch Superhero / Drone</li>
+          <li><b>C</b> switch chase / first-person camera</li>
         </ul>
         <ul class="help touch-help">
           <li><b>Left stick</b> steer · <b>right slider</b> throttle</li>
           <li><b>TILT</b> steer by tilting: hold the device how you like, then tap TILT</li>
-          <li><b>MODE</b> switch Superhero / Drone</li>
+          <li><b>VIEW</b> switch chase / first-person camera · <b>MODE</b> switch Superhero / Drone</li>
         </ul>
         <button id="btn-sound" class="quiet">Sound: on</button>
       </div>
