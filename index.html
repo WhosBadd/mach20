@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Mach 20</title>
+    <meta name="description" content="Fly the real Earth in 3D, from a hover to orbital speed." />
+    <meta name="theme-color" content="#000000" />
+
+    <!-- Home-screen app: on iPhone/iPad open in Safari, then Share → Add to Home Screen. -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Mach 20" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+
+    <link rel="stylesheet" href="https://unpkg.com/cesium@1.146.0/Build/Cesium/Widgets/widgets.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://unpkg.com/cesium@1.146.0/Build/Cesium/Cesium.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </head>
+
+  <body class="mode-hero">
+    <div id="globe"></div>
+    <div id="heat" class="layer"></div>
+
+    <!-- Superhero: glass helmet display -->
+    <div id="hero-hud" class="layer">
+      <div class="visor"></div>
+      <div class="hero-compass">
+        <div id="hero-compass" class="compass-tape"></div>
+        <div class="compass-pointer"></div>
+      </div>
+      <div class="ladder-window"><div id="hero-ladder" class="ladder"></div></div>
+      <div class="reticle"></div>
+      <div class="readout left">
+        <div class="label">SPEED</div>
+        <div class="big"><span id="hero-speed">0</span><small>MPH</small></div>
+        <div id="hero-mach" class="mid">M 0.00</div>
+        <div id="hero-g" class="small">1.0 G</div>
+      </div>
+      <div class="readout right">
+        <div class="label">ALTITUDE</div>
+        <div class="big"><span id="hero-alt">0</span><small>FT</small></div>
+        <div id="hero-vs" class="mid">▲ 0 FPM</div>
+        <div id="hero-agl" class="small">AGL ---</div>
+      </div>
+      <div id="hero-throttle" class="hero-throttle">THR 0%</div>
+    </div>
+
+    <!-- Recon drone: sensor-feed terminal -->
+    <div id="drone-hud" class="layer">
+      <div class="lens"></div>
+      <div id="drone-noise" class="noise"></div>
+      <div class="scanlines"></div>
+      <div id="drone-horizon" class="drone-horizon"></div>
+      <div class="brackets"><i></i><i></i><i></i><i></i></div>
+      <div class="crosshair"></div>
+      <div class="block tl">
+        <div><span class="rec">●</span> REC · EO WIDE</div>
+        <div id="drone-time">00:00:00Z</div>
+      </div>
+      <div class="block tc"><div id="drone-hdg">HDG 000°</div></div>
+      <div class="block tr">
+        <div id="drone-lat">LAT</div>
+        <div id="drone-lon">LON</div>
+      </div>
+      <div class="block bl">
+        <div id="drone-gs">GS 0 KT</div>
+        <div id="drone-mach">MACH 0.00</div>
+        <div id="drone-throttle">THR 0%</div>
+      </div>
+      <div class="block br">
+        <div id="drone-alt">ALT 0 FT</div>
+        <div id="drone-agl">AGL --- FT</div>
+        <div id="drone-vs">VS +0 FPM</div>
+      </div>
+    </div>
+
+    <div id="warning" class="warning hidden">PULL UP</div>
+
+    <!-- Touch controls (iPhone / iPad) -->
+    <div id="touch">
+      <div id="stick" class="stick"><div id="stick-knob" class="stick-knob"></div></div>
+      <div id="throttle" class="throttle"><div id="throttle-fill" class="throttle-fill"></div><span id="throttle-label">0%</span></div>
+      <div class="touch-buttons">
+        <button id="btn-tilt">TILT</button>
+        <button id="btn-mode">MODE</button>
+        <button id="btn-menu">MENU</button>
+      </div>
+    </div>
+
+    <!-- Phones held upright are too narrow to fly well -->
+    <div class="rotate">
+      <i></i>
+      <p>Turn your phone sideways to fly</p>
+    </div>
+
+    <!-- Start / pause menu -->
+    <div id="menu" class="menu">
+      <div class="card">
+        <h1>MACH 20</h1>
+        <p class="tagline">Fly the real Earth, from a hover to orbital speed.</p>
+        <p id="status" class="status">Loading the 3D Earth…</p>
+        <button id="btn-start" class="primary" disabled>Start flying</button>
+
+        <div class="section">Flight mode</div>
+        <div class="segmented">
+          <button data-mode="hero">Superhero</button>
+          <button data-mode="drone">Recon drone</button>
+        </div>
+
+        <div class="section">Jump to</div>
+        <div id="places" class="places"></div>
+
+        <div class="section">Controls</div>
+        <ul class="help desktop-help">
+          <li><b>Mouse</b> steer. Click the view to grab the mouse, <b>Esc</b> for this menu</li>
+          <li><b>↑ ↓</b> climb / dive · <b>← →</b> bank · <b>Q E</b> yaw</li>
+          <li><b>W S</b> or <b>scroll</b> throttle · <b>V</b> switch Superhero / Drone</li>
+        </ul>
+        <ul class="help touch-help">
+          <li><b>Left stick</b> steer · <b>right slider</b> throttle</li>
+          <li><b>TILT</b> steer by tilting: hold the device how you like, then tap TILT</li>
+          <li><b>MODE</b> switch Superhero / Drone</li>
+        </ul>
+        <button id="btn-sound" class="quiet">Sound: on</button>
+      </div>
+    </div>
+  </body>
+</html>
